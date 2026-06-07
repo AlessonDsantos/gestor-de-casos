@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Case Tracker</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+<div class="container">
+
+    <h1>Case Tracker</h1>
+    <div id="followUpAlerts"></div>
+    <div class="dashboard">
+
+        <div class="card">
+            <h3>Total</h3>
+            <span id="totalCases">0</span>
+        </div>
+
+        <div class="card needinfo">
+            <h3>Need Info</h3>
+            <span id="needInfoCount">0</span>
+        </div>
+
+        <div class="card implemented">
+            <h3>Implemented</h3>
+            <span id="implementedCount">0</span>
+        </div>
+
+        <div class="card inactive">
+            <h3>Inactive</h3>
+            <span id="inactiveCount">0</span>
+        </div>
+
+    </div>
+
+    <div class="form">
+
+        <h2>Novo Caso</h2>
+
+        <input type="text" id="caseNumber" placeholder="Número do Caso">
+
+        <select id="status">
+            <option value="">Selecione Status</option>
+            <option>Need Info</option>
+            <option>Implemented</option>
+            <option>Inactive</option>
+        </select>
+
+        <select id="subStatus">
+            <option value="">Selecione Substatus</option>
+        </select>
+
+        <textarea id="notes" placeholder="Observações"></textarea>
+        <label>Follow Up</label>
+        <input type="date" id="followUpDate">
+
+        <div class="checks">
+            <label>
+                <input type="checkbox" id="noteAdded">
+                Nota Adicionada
+            </label>
+
+            <label>
+                <input type="checkbox" id="emailSent">
+                Email Enviado
+            </label>
+
+            <label>
+                <input type="checkbox" id="qplusDone">
+                QPlus Preenchido
+            </label>
+        </div>
+
+        <button id="saveButton" onclick="saveCase()">
+    Salvar Caso
+</button>
+
+    </div>
+
+    <div class="chart-container">
+        <canvas id="statusChart"></canvas>
+    </div>
+
+    <div class="table-container">
+
+        <input
+            type="text"
+            id="search"
+            placeholder="Buscar caso..."
+            onkeyup="renderCases()">
+
+        <table>
+
+    <thead>
+       <tr>
+        <th>Caso</th>
+        <th>Status</th>
+        <th>Substatus</th>
+
+        <th>Criado</th>
+        <th>Atualizado</th>
+        <th>Follow Up</th>
+
+        <th>Nota</th>
+        <th>Email</th>
+        <th>QPlus</th>
+
+        <th>Ações</th>
+    </tr>
+    </thead>
+
+            <tbody id="caseTable"></tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+<script src="script.js"></script>
+
+</body>
+</html>
