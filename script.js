@@ -8,11 +8,12 @@ let editingCaseId = null;
 
 const subStatusMap = {
 
-    "Need Info":[
+    "Need Info": [
         "Awaiting Validation",
         "Awaiting Inputs",
         "Attempted Contact",
-        "In Consult"
+        "In Consult",
+        "Reschedule"
     ],
 
     "Implemented":[
