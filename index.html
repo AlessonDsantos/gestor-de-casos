@@ -15,10 +15,25 @@
 
     <h1>Case Tracker</h1>
     <div id="followUpAlerts"></div>
+
+    <!-- FILTRO DE PERÍODO GLOBAL -->
+    <div class="global-filter">
+        <div class="filter-group">
+            <label>Período do Dashboard:</label>
+            <div class="period-controls">
+                <input type="date" id="globalDateFrom" onchange="applyGlobalFilter()">
+                <span class="separator">até</span>
+                <input type="date" id="globalDateTo" onchange="applyGlobalFilter()">
+                <button class="clear-period-btn" onclick="clearGlobalFilter()">Limpar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DASHBOARD -->
     <div class="dashboard">
 
         <div class="card">
-            <h3>Total</h3>
+            <h3>Total (válidos)</h3>
             <span id="totalCases">0</span>
         </div>
 
@@ -37,8 +52,19 @@
             <span id="inactiveCount">0</span>
         </div>
 
+        <div class="card discarded">
+            <h3>Discarded</h3>
+            <span id="discardedCount">0</span>
+        </div>
+
     </div>
 
+    <!-- GRÁFICO -->
+    <div class="chart-container">
+        <canvas id="statusChart"></canvas>
+    </div>
+
+    <!-- FORMULÁRIO -->
     <div class="form">
 
         <h2>Novo Caso</h2>
@@ -50,6 +76,7 @@
             <option>Need Info</option>
             <option>Implemented</option>
             <option>Inactive</option>
+            <option>Discarded</option>
         </select>
 
         <select id="subStatus">
@@ -57,8 +84,18 @@
         </select>
 
         <textarea id="notes" placeholder="Observações"></textarea>
-        <label>Follow Up</label>
-        <input type="date" id="followUpDate">
+
+        <!-- FOLLOW UP - Visível apenas para Need Info, Inactive e Implemented -->
+        <div id="followUpSection" class="follow-up-section" style="display: none;">
+            <label>Follow Up</label>
+            <div class="follow-up-controls">
+                <input type="date" id="followUpDate">
+                <label class="na-checkbox">
+                    <input type="checkbox" id="followUpNA">
+                    N/A (Não Aplicado)
+                </label>
+            </div>
+        </div>
 
         <div class="checks">
             <label>
@@ -78,42 +115,69 @@
         </div>
 
         <button id="saveButton" onclick="saveCase()">
-    Salvar Caso
-</button>
+            Salvar Caso
+        </button>
 
     </div>
 
-    <div class="chart-container">
-        <canvas id="statusChart"></canvas>
-    </div>
-
+    <!-- TABELA E FILTROS -->
     <div class="table-container">
 
-        <input
-            type="text"
-            id="search"
-            placeholder="Buscar caso..."
-            onkeyup="renderCases()">
+        <!-- Filtros -->
+        <div class="filters">
+
+            <div class="filter-group">
+                <label>Buscar caso:</label>
+                <input
+                    type="text"
+                    id="search"
+                    placeholder="Buscar por número..."
+                    oninput="renderCases()">
+            </div>
+
+            <div class="filter-group">
+                <label>Status:</label>
+                <select id="filterStatus" onchange="renderCases()">
+                    <option value="">All</option>
+                    <option value="Implemented">Implemented</option>
+                    <option value="Need Info">Need Info</option>
+                    <option value="Inactive">Inactive</option>
+                    <option value="Discarded">Discarded</option>
+                </select>
+            </div>
+
+            <div class="filter-group">
+                <label>Data inicial:</label>
+                <input type="date" id="filterDateFrom" onchange="renderCases()">
+            </div>
+
+            <div class="filter-group">
+                <label>Data final:</label>
+                <input type="date" id="filterDateTo" onchange="renderCases()">
+            </div>
+
+            <div class="filter-group filter-btn-group">
+                <button class="clear-filters-btn" onclick="clearFilters()">Limpar Filtros</button>
+            </div>
+
+        </div>
 
         <table>
 
-    <thead>
-       <tr>
-        <th>Caso</th>
-        <th>Status</th>
-        <th>Substatus</th>
-
-        <th>Criado</th>
-        <th>Atualizado</th>
-        <th>Follow Up</th>
-
-        <th>Nota</th>
-        <th>Email</th>
-        <th>QPlus</th>
-
-        <th>Ações</th>
-    </tr>
-    </thead>
+            <thead>
+               <tr>
+                <th>Caso</th>
+                <th>Status</th>
+                <th>Substatus</th>
+                <th>Criado</th>
+                <th>Atualizado</th>
+                <th>Follow Up</th>
+                <th>Nota</th>
+                <th>Email</th>
+                <th>QPlus</th>
+                <th>Ações</th>
+            </tr>
+            </thead>
 
             <tbody id="caseTable"></tbody>
 
