@@ -1,13 +1,27 @@
+// =============================================
+// STORAGE & DADOS
+// =============================================
+
 const STORAGE_KEY = "caseTracker";
 
-let cases =
-JSON.parse(localStorage.getItem(STORAGE_KEY))
-|| [];
+let cases = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+
+// Migração: garante que registros antigos tenham campos novos
+cases = cases.map(c => {
+    if (!c.status) c.status = "";
+    // Remove status "Follow Up" se existir em dados antigos
+    if (c.status === "Follow Up") c.status = "";
+    return c;
+});
+saveStorage();
 
 let editingCaseId = null;
 
-const subStatusMap = {
+// =============================================
+// MAPA DE SUBSTATUS (sem Follow Up)
+// =============================================
 
+const subStatusMap = {
     "Need Info": [
         "Awaiting Validation",
         "Awaiting Inputs",
@@ -15,507 +29,506 @@ const subStatusMap = {
         "In Consult",
         "Reschedule"
     ],
-
-    "Implemented":[
+    "Implemented": [
         "Education Only",
         "Implemented Only",
         "Troubleshooting Only"
     ],
-
-    "Inactive":[
+    "Inactive": [
         "Not Interested",
         "Not Reachable",
         "Not Ready",
         "Out Of Scope"
     ],
-
-    "Open":[]
+    "Discarded": [],
+    "Open": []
 };
 
-const statusSelect =
-document.getElementById("status");
+// =============================================
+// ELEMENTOS DO FORMULÁRIO
+// =============================================
 
-const subStatusSelect =
-document.getElementById("subStatus");
+const statusSelect      = document.getElementById("status");
+const subStatusSelect   = document.getElementById("subStatus");
+const followUpSection   = document.getElementById("followUpSection");
+const followUpDateInput = document.getElementById("followUpDate");
+const followUpNACheckbox = document.getElementById("followUpNA");
 
-statusSelect.addEventListener("change", ()=>{
-
+// Mostrar/ocultar seção de Follow Up baseado no status
+statusSelect.addEventListener("change", () => {
     const status = statusSelect.value;
 
-    subStatusSelect.innerHTML =
-    '<option value="">Selecione</option>';
-
-    if(subStatusMap[status]){
-
-        subStatusMap[status].forEach(sub=>{
-
-            const option =
-            document.createElement("option");
-
+    // Atualizar substatus
+    subStatusSelect.innerHTML = '<option value="">Selecione</option>';
+    if (subStatusMap[status]) {
+        subStatusMap[status].forEach(sub => {
+            const option = document.createElement("option");
             option.value = sub;
             option.textContent = sub;
-
             subStatusSelect.appendChild(option);
         });
     }
+
+    // Mostrar Follow Up para "Need Info", "Inactive" e "Implemented"
+    const statusesComFollowUp = ["Need Info", "Inactive", "Implemented"];
+    if (statusesComFollowUp.includes(status)) {
+        followUpSection.style.display = "block";
+    } else {
+        followUpSection.style.display = "none";
+        // Limpar follow up quando muda para outro status
+        followUpDateInput.value = "";
+        followUpNACheckbox.checked = false;
+    }
 });
 
-function saveStorage(){
-    localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(cases)
-    );
+// Sincronizar data e checkbox N/A
+followUpDateInput.addEventListener("change", () => {
+    if (followUpDateInput.value) {
+        followUpNACheckbox.checked = false;
+    }
+});
+
+followUpNACheckbox.addEventListener("change", () => {
+    if (followUpNACheckbox.checked) {
+        followUpDateInput.value = "";
+    }
+});
+
+// =============================================
+// PERSISTÊNCIA
+// =============================================
+
+function saveStorage() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cases));
 }
 
-function addCase(){
+// =============================================
+// ADICIONAR CASO
+// =============================================
 
-    const caseNumber =
-    document.getElementById("caseNumber").value;
-
-    if(!caseNumber){
+function addCase() {
+    const caseNumber = document.getElementById("caseNumber").value.trim();
+    if (!caseNumber) {
         alert("Informe o número do caso");
         return;
     }
 
-   cases.push({
+    const status = document.getElementById("status").value;
 
-    id: Date.now(),
+    // Validar Follow Up para Need Info, Inactive e Implemented
+    let followUpDate = "";
+    let followUpNA = false;
+    const statusesComFollowUp = ["Need Info", "Inactive", "Implemented"];
+    
+    if (statusesComFollowUp.includes(status)) {
+        followUpDate = document.getElementById("followUpDate").value;
+        followUpNA = document.getElementById("followUpNA").checked;
+        if (!followUpDate && !followUpNA) {
+            alert(`Para ${status}, informe uma data de Follow Up ou marque N/A`);
+            return;
+        }
+    }
 
-    caseNumber,
-
-    status:
-    document.getElementById("status").value,
-
-    subStatus:
-    document.getElementById("subStatus").value,
-
-    notes:
-    document.getElementById("notes").value,
-
-    followUpDate:
-    document.getElementById("followUpDate").value,
-
-    noteAdded:
-    document.getElementById("noteAdded").checked,
-
-    emailSent:
-    document.getElementById("emailSent").checked,
-
-    qplusDone:
-    document.getElementById("qplusDone").checked,
-
-    createdAt:
-    new Date().toLocaleString(),
-
-    updatedAt:
-    new Date().toLocaleString()
-
-});
+    cases.push({
+        id:           Date.now(),
+        caseNumber,
+        status,
+        subStatus:    document.getElementById("subStatus").value,
+        notes:        document.getElementById("notes").value,
+        followUpDate: followUpDate,
+        followUpNA:   followUpNA,
+        noteAdded:    document.getElementById("noteAdded").checked,
+        emailSent:    document.getElementById("emailSent").checked,
+        qplusDone:    document.getElementById("qplusDone").checked,
+        createdAt:    new Date().toLocaleString(),
+        updatedAt:    new Date().toLocaleString()
+    });
 
     saveStorage();
-
-renderCases();
-updateDashboard();
-updateFollowUpAlerts();
-clearForm();
-
-document.getElementById("caseNumber").value = "";
-
-document.getElementById("status").value = "";
-
-document.getElementById("subStatus").innerHTML =
-'<option value="">Selecione Substatus</option>';
-
-document.getElementById("notes").value = "";
-
-document.getElementById("noteAdded").checked = false;
-
-document.getElementById("emailSent").checked = false;
-
-document.getElementById("qplusDone").checked = false;
+    renderCases();
+    updateDashboard();
+    updateFollowUpAlerts();
+    clearForm();
 }
 
-function deleteCase(id){
+// =============================================
+// EXCLUIR CASO
+// =============================================
 
-    if(!confirm("Excluir caso?"))
-        return;
-
-    cases =
-    cases.filter(c=>c.id !== id);
-
+function deleteCase(id) {
+    if (!confirm("Excluir caso?")) return;
+    cases = cases.filter(c => c.id !== id);
     saveStorage();
-
     renderCases();
     updateDashboard();
     updateFollowUpAlerts();
 }
 
-function renderCases(){
+// =============================================
+// HELPER: classe CSS por status
+// =============================================
 
-    const table =
-    document.getElementById("caseTable");
+function getStatusClass(status) {
+    switch ((status || "").toLowerCase().replace(/\s/g, "")) {
+        case "implemented": return "status-implemented";
+        case "inactive":    return "status-inactive";
+        case "needinfo":    return "status-needinfo";
+        case "discarded":   return "status-discarded";
+        default:            return "";
+    }
+}
 
-    const search =
-    document.getElementById("search")
-    .value.toLowerCase();
+// =============================================
+// HELPER: obter data de criação como string ISO
+// para comparação com filtros de data
+// =============================================
+
+function getCreatedDateISO(c) {
+    if (!c.createdAt) return "";
+    const d = new Date(c.createdAt);
+    if (!isNaN(d.getTime())) {
+        return d.toISOString().split("T")[0];
+    }
+    // Fallback: tenta extrair dd/mm/yyyy ou mm/dd/yyyy
+    const parts = c.createdAt.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (parts) {
+        // Formato brasileiro dd/mm/yyyy
+        const iso = `${parts[3]}-${parts[2].padStart(2,"0")}-${parts[1].padStart(2,"0")}`;
+        return iso;
+    }
+    return "";
+}
+
+// =============================================
+// RENDERIZAR TABELA (com todos os filtros)
+// =============================================
+
+function renderCases() {
+    const table        = document.getElementById("caseTable");
+    const search       = (document.getElementById("search").value || "").toLowerCase();
+    const filterStatus = (document.getElementById("filterStatus").value || "");
+    const filterFrom   = (document.getElementById("filterDateFrom").value || "");
+    const filterTo     = (document.getElementById("filterDateTo").value || "");
 
     table.innerHTML = "";
 
+    const today = new Date().toISOString().split("T")[0];
+
+    const getPriority = (item) => {
+        // Casos com Follow Up N/A não têm prioridade
+        if (item.followUpNA) return 999;
+        
+        if (item.followUpDate && item.followUpDate < today) return 1; // vencido
+        if (item.followUpDate === today) return 2;                    // hoje
+        return 3;
+    };
+
     cases
+        .slice()
+        .sort((a, b) => getPriority(a) - getPriority(b))
+        .filter(c => {
+            // Filtro: busca por número
+            if (search && !c.caseNumber.toLowerCase().includes(search)) return false;
 
-    .sort((a,b)=>{
+            // Filtro: status
+            if (filterStatus && c.status !== filterStatus) return false;
 
-        const today =
-        new Date().toISOString().split('T')[0];
+            // Filtro: data inicial e final (usa createdAt)
+            const dateISO = getCreatedDateISO(c);
+            if (filterFrom && dateISO && dateISO < filterFrom) return false;
+            if (filterTo   && dateISO && dateISO > filterTo)   return false;
 
-        const getPriority = (item)=>{
-
-            if(
-                item.followUpDate &&
-                item.followUpDate < today
-            ){
-                return 1; // vencido
+            return true;
+        })
+        .forEach(c => {
+            const statusClass = getStatusClass(c.status);
+            
+            // Exibir Follow Up na tabela
+            let followUpDisplay = "-";
+            if (c.followUpNA) {
+                followUpDisplay = "N/A";
+            } else if (c.followUpDate) {
+                followUpDisplay = c.followUpDate;
             }
 
-            if(
-                item.followUpDate === today
-            ){
-                return 2; // hoje
-            }
+            // Verificar se é Follow Up para hoje
+            const isFollowUpToday = c.followUpDate === today && !c.followUpNA;
+            const rowClass = isFollowUpToday ? 'follow-up-today' : '';
 
-            return 3; // restante
-        };
+            table.innerHTML += `
+            <tr class="${rowClass}">
+                <td>${c.caseNumber}</td>
+                <td><span class="${statusClass}">${c.status || '-'}</span></td>
+                <td>${c.subStatus || '-'}</td>
+                <td>${c.createdAt || '-'}</td>
+                <td>${c.updatedAt || '-'}</td>
+                <td>${followUpDisplay}</td>
+                <td>${c.noteAdded  ? '✅' : '❌'}</td>
+                <td>${c.emailSent  ? '✅' : '❌'}</td>
+                <td>${c.qplusDone  ? '✅' : '❌'}</td>
+                <td>
+                    <button class="edit-btn"   onclick="editCase(${c.id})">Editar</button>
+                    <button class="delete-btn" onclick="deleteCase(${c.id})">Excluir</button>
+                </td>
+            </tr>
+            `;
+        });
+}
 
-        return getPriority(a) - getPriority(b);
+// =============================================
+// LIMPAR FILTROS
+// =============================================
 
-    })
+function clearFilters() {
+    document.getElementById("search").value         = "";
+    document.getElementById("filterStatus").value   = "";
+    document.getElementById("filterDateFrom").value = "";
+    document.getElementById("filterDateTo").value   = "";
+    renderCases();
+}
 
-    .filter(c =>
-        c.caseNumber
-        .toLowerCase()
-        .includes(search)
-    )
+// =============================================
+// FILTRO GLOBAL DE PERÍODO
+// Afeta Dashboard e Gráficos
+// =============================================
 
-    .forEach(c=>{
+function applyGlobalFilter() {
+    updateDashboard();
+}
 
-        table.innerHTML += `
-        <tr>
+function clearGlobalFilter() {
+    document.getElementById("globalDateFrom").value = "";
+    document.getElementById("globalDateTo").value   = "";
+    updateDashboard();
+}
 
-            <td>${c.caseNumber}</td>
+function getGlobalFilteredCases() {
+    const globalFrom = (document.getElementById("globalDateFrom").value || "");
+    const globalTo   = (document.getElementById("globalDateTo").value || "");
 
-            <td>${c.status}</td>
-
-            <td>${c.subStatus || '-'}</td>
-
-            <td>${c.createdAt || '-'}</td>
-
-            <td>${c.updatedAt || '-'}</td>
-
-            <td>${c.followUpDate || '-'}</td>
-
-            <td>${c.noteAdded ? '✅':'❌'}</td>
-
-            <td>${c.emailSent ? '✅':'❌'}</td>
-
-            <td>${c.qplusDone ? '✅':'❌'}</td>
-
-            <td>
-
-                <button
-                    class="edit-btn"
-                    onclick="editCase(${c.id})">
-                    Editar
-                </button>
-
-                <button
-                    class="delete-btn"
-                    onclick="deleteCase(${c.id})">
-                    Excluir
-                </button>
-
-            </td>
-
-        </tr>
-        `;
+    return cases.filter(c => {
+        const dateISO = getCreatedDateISO(c);
+        if (globalFrom && dateISO && dateISO < globalFrom) return false;
+        if (globalTo   && dateISO && dateISO > globalTo)   return false;
+        return true;
     });
 }
 
+// =============================================
+// DASHBOARD E GRÁFICO
+// Casos "Discarded" são EXCLUÍDOS dos cálculos
+// Aplica filtro global de período
+// =============================================
+
 let chart;
 
-function updateDashboard(){
+function updateDashboard() {
+    // Aplicar filtro global de período
+    const filteredCases = getGlobalFilteredCases();
 
-    const total = cases.length;
+    // Casos válidos = todos exceto Discarded
+    const validCases   = filteredCases.filter(c => c.status !== "Discarded");
+    const total        = validCases.length;
 
-    const needInfo =
-    cases.filter(
-        c=>c.status==="Need Info"
-    ).length;
+    const needInfo     = validCases.filter(c => c.status === "Need Info").length;
+    const implemented  = validCases.filter(c => c.status === "Implemented").length;
+    const inactive     = validCases.filter(c => c.status === "Inactive").length;
 
-    const implemented =
-    cases.filter(
-        c=>c.status==="Implemented"
-    ).length;
+    // Discarded: contagem separada (exibida no card, mas fora dos gráficos)
+    const discarded    = filteredCases.filter(c => c.status === "Discarded").length;
 
-    const inactive =
-    cases.filter(
-        c=>c.status==="Inactive"
-    ).length;
+    const pct = (n) => total ? ((n / total) * 100).toFixed(1) : 0;
 
-    const needInfoPct =
-    total ? ((needInfo/total)*100).toFixed(1) : 0;
+    document.getElementById("totalCases").textContent      = total;
+    document.getElementById("needInfoCount").innerHTML     = `${needInfo}<br><small>${pct(needInfo)}%</small>`;
+    document.getElementById("implementedCount").innerHTML  = `${implemented}<br><small>${pct(implemented)}%</small>`;
+    document.getElementById("inactiveCount").innerHTML     = `${inactive}<br><small>${pct(inactive)}%</small>`;
+    document.getElementById("discardedCount").textContent  = discarded;
 
-    const implementedPct =
-    total ? ((implemented/total)*100).toFixed(1) : 0;
+    // Gráfico de pizza — apenas casos válidos
+    const ctx = document.getElementById("statusChart");
 
-    const inactivePct =
-    total ? ((inactive/total)*100).toFixed(1) : 0;
-
-    document.getElementById(
-        "totalCases"
-    ).textContent = total;
-
-    document.getElementById(
-        "needInfoCount"
-    ).innerHTML =
-    `${needInfo}<br><small>${needInfoPct}%</small>`;
-
-    document.getElementById(
-        "implementedCount"
-    ).innerHTML =
-    `${implemented}<br><small>${implementedPct}%</small>`;
-
-    document.getElementById(
-        "inactiveCount"
-    ).innerHTML =
-    `${inactive}<br><small>${inactivePct}%</small>`;
-
-    const ctx =
-    document.getElementById("statusChart");
-
-    if(chart){
+    if (chart) {
         chart.destroy();
     }
 
-    chart = new Chart(ctx,{
-
-        type:"pie",
-
-        data:{
-            labels:[
-                `Need Info (${needInfoPct}%)`,
-                `Implemented (${implementedPct}%)`,
-                `Inactive (${inactivePct}%)`
+    chart = new Chart(ctx, {
+        type: "pie",
+        data: {
+            labels: [
+                `Need Info (${pct(needInfo)}%)`,
+                `Implemented (${pct(implemented)}%)`,
+                `Inactive (${pct(inactive)}%)`
             ],
-
-            datasets:[{
-                data:[
-                    needInfo,
-                    implemented,
-                    inactive
+            datasets: [{
+                data: [needInfo, implemented, inactive],
+                backgroundColor: [
+                    "#f39c12",
+                    "#27ae60",
+                    "#e74c3c"
                 ]
             }]
         },
-
-        options:{
-            responsive:true,
-            maintainAspectRatio:false,
-
-            plugins:{
-                legend:{
-                    position:'bottom'
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: "bottom"
                 }
             }
         }
     });
 }
 
-function saveCase(){
+// =============================================
+// SALVAR / EDITAR CASO
+// =============================================
 
-    if(editingCaseId){
-
+function saveCase() {
+    if (editingCaseId) {
         updateCase();
-
-    }else{
-
+    } else {
         addCase();
-
     }
-
 }
 
-function editCase(id){
-
-    const caseData =
-    cases.find(c => c.id === id);
-
-    if(!caseData) return;
+function editCase(id) {
+    const caseData = cases.find(c => c.id === id);
+    if (!caseData) return;
 
     editingCaseId = id;
 
-    document.getElementById("caseNumber").value =
-    caseData.caseNumber;
+    document.getElementById("caseNumber").value  = caseData.caseNumber;
+    document.getElementById("status").value       = caseData.status;
 
-    document.getElementById("status").value =
-    caseData.status;
+    // Dispara change para popular substatus e mostrar Follow Up se necessário
+    statusSelect.dispatchEvent(new Event("change"));
 
-    statusSelect.dispatchEvent(
-        new Event('change')
-    );
-
-    document.getElementById("subStatus").value =
-    caseData.subStatus;
-
-    document.getElementById("notes").value =
-    caseData.notes;
-
-    document.getElementById("noteAdded").checked =
-    caseData.noteAdded;
-
-    document.getElementById("emailSent").checked =
-    caseData.emailSent;
-
-    document.getElementById("qplusDone").checked =
-    caseData.qplusDone;
-
-    document.getElementById("saveButton")
-    .textContent =
-    "Atualizar Caso";
-    document.getElementById("followUpDate").value =
-    caseData.followUpDate || "";
+    document.getElementById("subStatus").value    = caseData.subStatus || "";
+    document.getElementById("notes").value        = caseData.notes || "";
+    document.getElementById("noteAdded").checked  = caseData.noteAdded || false;
+    document.getElementById("emailSent").checked  = caseData.emailSent || false;
+    document.getElementById("qplusDone").checked  = caseData.qplusDone || false;
     
-    window.scrollTo({
-        top:0,
-        behavior:"smooth"
-    });
+    // Restaurar Follow Up
+    document.getElementById("followUpDate").value = caseData.followUpDate || "";
+    document.getElementById("followUpNA").checked = caseData.followUpNA || false;
 
+    document.getElementById("saveButton").textContent = "Atualizar Caso";
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function updateCase(){
+function updateCase() {
+    const index = cases.findIndex(c => c.id === editingCaseId);
+    if (index === -1) return;
 
-    const index =
-    cases.findIndex(
-        c => c.id === editingCaseId
-    );
+    const status = document.getElementById("status").value;
 
-    if(index === -1) return;
+    // Validar Follow Up para Need Info, Inactive e Implemented
+    let followUpDate = "";
+    let followUpNA = false;
+    const statusesComFollowUp = ["Need Info", "Inactive", "Implemented"];
+    
+    if (statusesComFollowUp.includes(status)) {
+        followUpDate = document.getElementById("followUpDate").value;
+        followUpNA = document.getElementById("followUpNA").checked;
+        if (!followUpDate && !followUpNA) {
+            alert(`Para ${status}, informe uma data de Follow Up ou marque N/A`);
+            return;
+        }
+    }
 
     cases[index] = {
-
-    ...cases[index],
-
-    caseNumber:
-    document.getElementById("caseNumber").value,
-
-    status:
-    document.getElementById("status").value,
-
-    subStatus:
-    document.getElementById("subStatus").value,
-
-    notes:
-    document.getElementById("notes").value,
-
-    followUpDate:
-    document.getElementById("followUpDate").value,
-
-    noteAdded:
-    document.getElementById("noteAdded").checked,
-
-    emailSent:
-    document.getElementById("emailSent").checked,
-
-    qplusDone:
-    document.getElementById("qplusDone").checked,
-
-    updatedAt:
-    new Date().toLocaleString()
-
-};
+        ...cases[index],
+        caseNumber:   document.getElementById("caseNumber").value.trim(),
+        status,
+        subStatus:    document.getElementById("subStatus").value,
+        notes:        document.getElementById("notes").value,
+        followUpDate: followUpDate,
+        followUpNA:   followUpNA,
+        noteAdded:    document.getElementById("noteAdded").checked,
+        emailSent:    document.getElementById("emailSent").checked,
+        qplusDone:    document.getElementById("qplusDone").checked,
+        updatedAt:    new Date().toLocaleString()
+    };
 
     saveStorage();
-
     renderCases();
     updateDashboard();
     updateFollowUpAlerts();
     clearForm();
 
     editingCaseId = null;
-
-    document.getElementById("saveButton")
-    .textContent =
-    "Salvar Caso";
-
+    document.getElementById("saveButton").textContent = "Salvar Caso";
 }
 
-function clearForm(){
+// =============================================
+// LIMPAR FORMULÁRIO
+// =============================================
 
-    document.getElementById("caseNumber").value = "";
-
-    document.getElementById("status").value = "";
-
-    document.getElementById("subStatus").innerHTML =
-    '<option value="">Selecione Substatus</option>';
-
-    document.getElementById("notes").value = "";
-
-    document.getElementById("noteAdded").checked = false;
-
-    document.getElementById("emailSent").checked = false;
-
-    document.getElementById("qplusDone").checked = false;
-
+function clearForm() {
+    document.getElementById("caseNumber").value  = "";
+    document.getElementById("status").value       = "";
+    document.getElementById("subStatus").innerHTML = '<option value="">Selecione Substatus</option>';
+    document.getElementById("notes").value        = "";
+    document.getElementById("noteAdded").checked  = false;
+    document.getElementById("emailSent").checked  = false;
+    document.getElementById("qplusDone").checked  = false;
     document.getElementById("followUpDate").value = "";
+    document.getElementById("followUpNA").checked = false;
+    followUpSection.style.display = "none";
 }
 
-function updateFollowUpAlerts(){
+// =============================================
+// ALERTAS DE FOLLOW UP
+// Apenas casos com Follow Up definido (não N/A)
+// =============================================
 
-    const today =
-    new Date().toISOString().split('T')[0];
+function updateFollowUpAlerts() {
+    const today = new Date().toISOString().split("T")[0];
 
-    const overdue =
-    cases.filter(c =>
-        c.followUpDate &&
+    // Casos com Follow Up definido (não N/A e não Discarded)
+    const casesComFollowUp = cases.filter(c => 
+        c.status !== "Discarded" && 
+        c.followUpDate && 
+        !c.followUpNA
+    );
+
+    const overdue = casesComFollowUp.filter(c =>
         c.followUpDate < today
     );
 
-    const todayCases =
-    cases.filter(c =>
+    const todayCases = casesComFollowUp.filter(c =>
         c.followUpDate === today
     );
 
-    const div =
-    document.getElementById(
-        "followUpAlerts"
-    );
-
+    const div = document.getElementById("followUpAlerts");
     let html = "";
 
-    if(overdue.length){
-
+    if (overdue.length) {
         html += `
         <div class="alert overdue">
-
-            ⚠️ Follow Ups Vencidos:
-            ${overdue.length}
-
+            ⚠️ Follow Ups Vencidos: ${overdue.length}
         </div>
         `;
     }
 
-    if(todayCases.length){
-
+    if (todayCases.length) {
         html += `
         <div class="alert today">
-
-            📅 Follow Ups Hoje:
-            ${todayCases.length}
-
+            📅 Follow Ups Hoje: ${todayCases.length}
         </div>
         `;
     }
 
     div.innerHTML = html;
 }
+
+// =============================================
+// INICIALIZAÇÃO
+// =============================================
 
 renderCases();
 updateDashboard();
