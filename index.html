@@ -13,8 +13,18 @@
 
 <div class="container">
 
-    <h1>Case Tracker</h1>
     <div id="followUpAlerts"></div>
+
+    <div class="header">
+
+    <h1>Case Tracker</h1>
+
+    <button id="themeToggle" onclick="toggleTheme()">
+        🌙 Dark Mode
+    </button>
+    
+
+</div>
 
     <!-- FILTRO DE PERÍODO GLOBAL -->
     <div class="global-filter">
@@ -30,31 +40,40 @@
     </div>
 
     <!-- DASHBOARD -->
+    <!-- DASHBOARD + GRÁFICO -->
+<div class="dashboard-panel">
+
+    <!-- DASHBOARD -->
     <div class="dashboard">
 
-        <div class="card">
-            <h3>Total (válidos)</h3>
-            <span id="totalCases">0</span>
+        <div class="card total-card">
+            <div class="card-title">📊 Total</div>
+            <div class="card-value" id="totalCases">0</div>
+            <div class="card-subtitle">Casos válidos</div>
         </div>
 
         <div class="card needinfo">
-            <h3>Need Info</h3>
-            <span id="needInfoCount">0</span>
+            <div class="card-title">🟠 Need Info</div>
+            <div class="card-value" id="needInfoCount">0</div>
+            <div class="card-subtitle">Casos ativos</div>
         </div>
 
         <div class="card implemented">
-            <h3>Implemented</h3>
-            <span id="implementedCount">0</span>
+            <div class="card-title">🟢 Implemented</div>
+            <div class="card-value" id="implementedCount">0</div>
+            <div class="card-subtitle">Resolvidos</div>
         </div>
 
         <div class="card inactive">
-            <h3>Inactive</h3>
-            <span id="inactiveCount">0</span>
+            <div class="card-title">🔴 Inactive</div>
+            <div class="card-value" id="inactiveCount">0</div>
+            <div class="card-subtitle">Sem ação</div>
         </div>
 
         <div class="card discarded">
-            <h3>Discarded</h3>
-            <span id="discardedCount">0</span>
+            <div class="card-title">⚪ Discarded</div>
+            <div class="card-value" id="discardedCount">0</div>
+            <div class="card-subtitle">Descartados</div>
         </div>
 
     </div>
@@ -63,6 +82,8 @@
     <div class="chart-container">
         <canvas id="statusChart"></canvas>
     </div>
+
+</div>
 
     <!-- FORMULÁRIO -->
     <div class="form">
@@ -164,14 +185,14 @@
 
         <table>
 
-            <thead>
-               <tr>
-                <th>Caso</th>
-                <th>Status</th>
-                <th>Substatus</th>
-                <th>Criado</th>
-                <th>Atualizado</th>
-                <th>Follow Up</th>
+<thead>
+   <tr>
+      <th onclick="sortCases('caseNumber')">Caso ↕</th>
+      <th onclick="sortCases('status')">Status ↕</th>
+      <th>Substatus</th>
+      <th onclick="sortCases('createdAt')">Criado ↕</th>
+      <th onclick="sortCases('updatedAt')">Atualizado ↕</th>
+      <th onclick="sortCases('followUpDate')">Follow Up ↕</th>
                 <th>Nota</th>
                 <th>Email</th>
                 <th>QPlus</th>
@@ -186,6 +207,21 @@
     </div>
 
 </div>
+
+<div id="viewModal" class="modal">
+    <div class="modal-content">
+
+        <span class="close-modal" onclick="closeViewModal()">
+            &times;
+        </span>
+
+        <h2>Detalhes do Caso</h2>
+
+        <div id="modalBody"></div>
+
+    </div>
+</div>
+
 
 <script src="script.js"></script>
 
