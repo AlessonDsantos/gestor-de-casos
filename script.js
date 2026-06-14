@@ -17,6 +17,11 @@ saveStorage();
 
 let editingCaseId = null;
 
+let currentSort = {
+    field: null,
+    direction: "asc"
+};
+
 // =============================================
 // MAPA DE SUBSTATUS (sem Follow Up)
 // =============================================
@@ -183,19 +188,41 @@ function getStatusClass(status) {
 // para comparação com filtros de data
 // =============================================
 
+function sortCases(field) {
+
+    if (currentSort.field === field) {
+
+        currentSort.direction =
+            currentSort.direction === "asc"
+                ? "desc"
+                : "asc";
+
+    } else {
+
+        currentSort.field = field;
+        currentSort.direction = "asc";
+
+    }
+
+    renderCases();
+}
+
 function getCreatedDateISO(c) {
+
     if (!c.createdAt) return "";
-    const d = new Date(c.createdAt);
-    if (!isNaN(d.getTime())) {
-        return d.toISOString().split("T")[0];
-    }
-    // Fallback: tenta extrair dd/mm/yyyy ou mm/dd/yyyy
-    const parts = c.createdAt.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+
+    // Extrai a data brasileira: dd/mm/yyyy
+    const parts = c.createdAt.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+
     if (parts) {
-        // Formato brasileiro dd/mm/yyyy
-        const iso = `${parts[3]}-${parts[2].padStart(2,"0")}-${parts[1].padStart(2,"0")}`;
-        return iso;
+
+        const day = parts[1].padStart(2, "0");
+        const month = parts[2].padStart(2, "0");
+        const year = parts[3];
+
+        return `${year}-${month}-${day}`;
     }
+
     return "";
 }
 
@@ -217,16 +244,16 @@ function renderCases() {
     const getPriority = (item) => {
         // Casos com Follow Up N/A não têm prioridade
         if (item.followUpNA) return 999;
-        
+
         if (item.followUpDate && item.followUpDate < today) return 1; // vencido
         if (item.followUpDate === today) return 2;                    // hoje
         return 3;
     };
 
-    cases
+    let filteredCases = cases
         .slice()
-        .sort((a, b) => getPriority(a) - getPriority(b))
         .filter(c => {
+
             // Filtro: busca por número
             if (search && !c.caseNumber.toLowerCase().includes(search)) return false;
 
@@ -235,46 +262,104 @@ function renderCases() {
 
             // Filtro: data inicial e final (usa createdAt)
             const dateISO = getCreatedDateISO(c);
+
             if (filterFrom && dateISO && dateISO < filterFrom) return false;
             if (filterTo   && dateISO && dateISO > filterTo)   return false;
 
             return true;
-        })
-        .forEach(c => {
-            const statusClass = getStatusClass(c.status);
-            
-            // Exibir Follow Up na tabela
-            let followUpDisplay = "-";
-            if (c.followUpNA) {
-                followUpDisplay = "N/A";
-            } else if (c.followUpDate) {
-                followUpDisplay = c.followUpDate;
+        });
+
+    // ==========================
+    // ORDENAÇÃO
+    // ==========================
+    if (currentSort.field) {
+
+        filteredCases.sort((a, b) => {
+
+            let valueA = a[currentSort.field] || "";
+            let valueB = b[currentSort.field] || "";
+
+            if (valueA < valueB) {
+                return currentSort.direction === "asc" ? -1 : 1;
             }
 
-            // Verificar se é Follow Up para hoje
-            const isFollowUpToday = c.followUpDate === today && !c.followUpNA;
-            const rowClass = isFollowUpToday ? 'follow-up-today' : '';
+            if (valueA > valueB) {
+                return currentSort.direction === "asc" ? 1 : -1;
+            }
 
-            table.innerHTML += `
-            <tr class="${rowClass}">
-                <td>${c.caseNumber}</td>
-                <td><span class="${statusClass}">${c.status || '-'}</span></td>
-                <td>${c.subStatus || '-'}</td>
-                <td>${c.createdAt || '-'}</td>
-                <td>${c.updatedAt || '-'}</td>
-                <td>${followUpDisplay}</td>
-                <td>${c.noteAdded  ? '✅' : '❌'}</td>
-                <td>${c.emailSent  ? '✅' : '❌'}</td>
-                <td>${c.qplusDone  ? '✅' : '❌'}</td>
-                <td>
-                    <button class="edit-btn"   onclick="editCase(${c.id})">Editar</button>
-                    <button class="delete-btn" onclick="deleteCase(${c.id})">Excluir</button>
-                </td>
-            </tr>
-            `;
+            return 0;
         });
+
+    } else {
+
+        // comportamento atual:
+        // Follow Ups vencidos primeiro
+        filteredCases.sort(
+            (a, b) => getPriority(a) - getPriority(b)
+        );
+
+    }
+
+    filteredCases.forEach(c => {
+
+        const statusClass = getStatusClass(c.status);
+
+        // Exibir Follow Up na tabela
+        let followUpDisplay = "-";
+
+        if (c.followUpNA) {
+            followUpDisplay = "N/A";
+        } else if (c.followUpDate) {
+            followUpDisplay = formatDateBR(c.followUpDate);
+        }
+
+        // Verificar se é Follow Up para hoje
+           let rowClass = '';
+
+     if (!c.followUpNA && c.followUpDate) {
+
+    if (c.followUpDate < today) {
+
+        rowClass = 'follow-up-overdue';
+
+    } else if (c.followUpDate === today) {
+
+        rowClass = 'follow-up-today';
+
+    } else {
+
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const tomorrowStr =
+            tomorrow.toISOString().split('T')[0];
+
+        if (c.followUpDate === tomorrowStr) {
+            rowClass = 'follow-up-upcoming';
+        }
+    }
 }
 
+        table.innerHTML += `
+        <tr class="${rowClass}">
+            <td>${c.caseNumber}</td>
+            <td><span class="${statusClass}">${c.status || '-'}</span></td>
+            <td>${c.subStatus || '-'}</td>
+            <td>${c.createdAt || '-'}</td>
+            <td>${c.updatedAt || '-'}</td>
+            <td>${followUpDisplay}</td>
+            <td>${c.noteAdded ? '✅' : '❌'}</td>
+            <td>${c.emailSent ? '✅' : '❌'}</td>
+            <td>${c.qplusDone ? '✅' : '❌'}</td>
+            <td>
+                <button class="view-btn" onclick="viewCase(${c.id})">Ver</button>
+                <button class="edit-btn" onclick="editCase(${c.id})">Editar</button>
+                <button class="delete-btn" onclick="deleteCase(${c.id})">Excluir</button>
+            </td>
+        </tr>
+        `;
+    });
+}
 // =============================================
 // LIMPAR FILTROS
 // =============================================
@@ -399,25 +484,29 @@ function editCase(id) {
 
     editingCaseId = id;
 
-    document.getElementById("caseNumber").value  = caseData.caseNumber;
-    document.getElementById("status").value       = caseData.status;
+    document.getElementById("caseNumber").value = caseData.caseNumber;
+    document.getElementById("status").value = caseData.status;
 
-    // Dispara change para popular substatus e mostrar Follow Up se necessário
+    // Dispara change para popular substatus e exibir Follow Up
     statusSelect.dispatchEvent(new Event("change"));
 
-    document.getElementById("subStatus").value    = caseData.subStatus || "";
-    document.getElementById("notes").value        = caseData.notes || "";
-    document.getElementById("noteAdded").checked  = caseData.noteAdded || false;
-    document.getElementById("emailSent").checked  = caseData.emailSent || false;
-    document.getElementById("qplusDone").checked  = caseData.qplusDone || false;
-    
+    document.getElementById("subStatus").value = caseData.subStatus || "";
+    document.getElementById("notes").value = caseData.notes || "";
+    document.getElementById("noteAdded").checked = caseData.noteAdded || false;
+    document.getElementById("emailSent").checked = caseData.emailSent || false;
+    document.getElementById("qplusDone").checked = caseData.qplusDone || false;
+
     // Restaurar Follow Up
     document.getElementById("followUpDate").value = caseData.followUpDate || "";
     document.getElementById("followUpNA").checked = caseData.followUpNA || false;
 
     document.getElementById("saveButton").textContent = "Atualizar Caso";
 
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    // Rolar até o formulário
+    document.querySelector(".form").scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+    });
 }
 
 function updateCase() {
@@ -525,6 +614,127 @@ function updateFollowUpAlerts() {
 
     div.innerHTML = html;
 }
+
+function formatDateBR(dateString) {
+
+    if (!dateString) return "-";
+
+    const [year, month, day] = dateString.split("-");
+
+    return `${day}/${month}/${year}`;
+}
+
+
+function viewCase(id){
+
+    const c = cases.find(x => x.id === id);
+
+    if(!c) return;
+
+    let followUpDisplay = "N/A";
+
+    if(!c.followUpNA && c.followUpDate){
+        followUpDisplay = c.followUpDate;
+    }
+
+    document.getElementById("modalBody").innerHTML = `
+
+ <div class="case-header">
+    <h3>Caso #${c.caseNumber}</h3>
+    <span class="${getStatusClass(c.status)} status-badge">
+    ${c.status}
+</span>
+</div>
+
+<div class="details-grid">
+
+    <div class="detail-card">
+        <strong>Substatus</strong>
+        <p>${c.subStatus || "-"}</p>
+    </div>
+
+    <div class="detail-card">
+        <strong>Follow Up</strong>
+        <p>${followUpDisplay}</p>
+    </div>
+
+    <div class="detail-card">
+        <strong>Criado</strong>
+        <p>${c.createdAt || "-"}</p>
+    </div>
+
+    <div class="detail-card">
+        <strong>Atualizado</strong>
+        <p>${c.updatedAt || "-"}</p>
+    </div>
+
+</div>
+
+<div class="flags-section">
+
+    <span class="flag-badge">
+        ${c.noteAdded ? "✅" : "❌"} Nota
+    </span>
+
+    <span class="flag-badge">
+        ${c.emailSent ? "✅" : "❌"} Email
+    </span>
+
+    <span class="flag-badge">
+        ${c.qplusDone ? "✅" : "❌"} QPlus
+    </span>
+
+</div>
+
+<div class="observations-section">
+
+    <h4>📝 Observações</h4>
+
+    <div class="observations-box">
+        ${c.observations || "Nenhuma observação"}
+    </div>
+
+</div>
+
+`;
+
+
+    document.getElementById("viewModal").style.display = "block";
+}
+
+function closeViewModal(){
+    document.getElementById("viewModal").style.display = "none";
+}
+
+window.onclick = function(event) {
+
+    const modal = document.getElementById("viewModal");
+
+    if (event.target === modal) {
+        closeViewModal();
+    }
+
+};
+
+function toggleTheme(){
+
+    document.body.classList.toggle("dark-mode");
+
+    const isDark =
+        document.body.classList.contains("dark-mode");
+
+    localStorage.setItem(
+        "theme",
+        isDark ? "dark" : "light"
+    );
+
+    document.getElementById("themeToggle").textContent =
+        isDark
+            ? "☀️ Light Mode"
+            : "🌙 Dark Mode";
+}
+
+
 
 // =============================================
 // INICIALIZAÇÃO
